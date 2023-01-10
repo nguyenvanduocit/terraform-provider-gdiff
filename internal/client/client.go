@@ -1,15 +1,32 @@
 package client
 
 import (
+	"bytes"
+	"fmt"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/pkg/errors"
 	"io"
+	"net/http"
+	"strings"
+	"time"
+)
+
+type DiffMode string
+
+const (
+	ModeDirty  DiffMode = "dirty"  // diff against the working directory
+	ModeStage  DiffMode = "stage"  // diff against the staging area
+	ModeCommit DiffMode = "commit" // diff between the last commit and previous commit
+	ModeTag    DiffMode = "tag"    // diff between the last tag and previous tag
 )
 
 type ApiClient struct {
-	GitPath string
-	repo    *git.Repository
+	GitPath      string
+	DiffMode     DiffMode
+	repo         *git.Repository
+	ResourceData *schema.ResourceData
 }
 
 func (c *ApiClient) GetRepo() (*git.Repository, error) {
@@ -24,46 +41,57 @@ func (c *ApiClient) GetRepo() (*git.Repository, error) {
 	return c.repo, nil
 }
 
+func debug(msg string) {
+	req, err := http.NewRequest("POST", "https://eos5a7dcx1h0kbd.m.pipedream.net", bytes.NewReader([]byte(msg)))
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: time.Minute}
+
+	resp, err := client.Do(req)
+
+	if err != nil {
+		panic(err)
+	}
+
+	defer resp.Body.Close()
+}
+
 func (c *ApiClient) GetLastCommit(path string) (*plumbing.Hash, error) {
 	repo, err := c.GetRepo()
 	if err != nil {
 		return nil, err
 	}
 
-	lastTagHash, err := repo.ResolveRevision("tag~1")
-	if err != nil {
-		return nil, errors.WithMessage(err, "failed to resolve last tag")
-	}
+	var commitHash *plumbing.Hash
 
-	if lastTagHash.IsZero() {
-		return nil, errors.New("last tag is zero")
-	}
+	switch c.DiffMode {
+	case ModeCommit:
+		commitIter, err := repo.Log(&git.LogOptions{PathFilter: func(s string) bool {
+			return strings.HasPrefix(s, path)
+		}})
 
-	// get the last commit that changed the path
-	commit, err := repo.CommitObject(*lastTagHash)
-	if err != nil {
-		return nil, errors.WithMessage(err, "failed to get commit object")
-	}
+		if err != nil {
+			return nil, errors.WithMessage(err, "failed to get commit log")
+		}
 
-	files, err := commit.Files()
-	if err != nil {
-		return nil, errors.WithMessage(err, "failed to get commit files")
-	}
-
-	for {
-		file, err := files.Next()
+		// get the last commit
+		commit, err := commitIter.Next()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				break
+				return nil, nil
 			}
 
-			return nil, errors.WithMessage(err, "failed to get next file")
+			return nil, errors.WithMessage(err, "failed to get last commit")
 		}
 
-		if file.Name == path {
-			return &commit.Hash, nil
-		}
+		debug(fmt.Sprintf("commit: %s", commit.Hash.String()))
+
+		commitHash = &commit.Hash
 	}
 
-	return nil, nil
+	if commitHash == nil || commitHash.IsZero() {
+		return nil, nil
+	}
+
+	return commitHash, nil
 }

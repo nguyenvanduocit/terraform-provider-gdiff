@@ -34,6 +34,12 @@ func New(version string) func() *schema.Provider {
 					Description: "Absolute path to the git folder",
 					DefaultFunc: schema.EnvDefaultFunc("GIT_PATH", nil),
 				},
+				"diff_mode": {
+					Type:        schema.TypeString,
+					Optional:    true,
+					Description: "DiffMode of the git repository. e.g. 'tag' or 'commit', 'stage', 'dirty'",
+					DefaultFunc: schema.EnvDefaultFunc("GIT_DIFF_MODE", "tag"),
+				},
 			},
 			DataSourcesMap: map[string]*schema.Resource{
 				"gdiff_commit": dataSourceGdiff(),
@@ -49,7 +55,9 @@ func New(version string) func() *schema.Provider {
 func configure(version string, p *schema.Provider) func(context.Context, *schema.ResourceData) (any, diag.Diagnostics) {
 	return func(ctx context.Context, d *schema.ResourceData) (any, diag.Diagnostics) {
 		return &client.ApiClient{
-			GitPath: d.Get("git_path").(string),
+			DiffMode:     client.DiffMode(d.Get("diff_mode").(string)),
+			GitPath:      d.Get("git_path").(string),
+			ResourceData: d,
 		}, nil
 	}
 }

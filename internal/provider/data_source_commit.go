@@ -10,7 +10,7 @@ import (
 func dataSourceGdiff() *schema.Resource {
 	return &schema.Resource{
 		// This description is used by the documentation generator and the language server.
-		Description: "Sample data source in the Terraform provider gdiff.",
+		Description: "This data source provides the last commit of a file or folder",
 
 		ReadContext: dataSourceGdiffRead,
 
@@ -19,6 +19,11 @@ func dataSourceGdiff() *schema.Resource {
 				Description: "Absolute path to the file,directory.",
 				Type:        schema.TypeString,
 				Required:    true,
+			},
+			"hash": {
+				Description: "The hash of the last commit",
+				Type:        schema.TypeString,
+				Computed:    true,
 			},
 		},
 	}
@@ -34,7 +39,17 @@ func dataSourceGdiffRead(ctx context.Context, d *schema.ResourceData, meta any) 
 		return diag.FromErr(err)
 	}
 
-	d.SetId(commit.String())
+	if commit != nil {
+		d.SetId(commit.String())
+		d.Set("hash", commit.String())
+		return nil
+	}
+
+	// The commit does not contain the path, so we can't use it as ID, try to get th existing ID
+	if hash, ok := d.GetOk("hash"); ok {
+		d.SetId(hash.(string))
+		d.Set("hash", hash.(string))
+	}
 
 	return nil
 }

@@ -24,3 +24,7 @@ provider "gdiff" {
 ### Required
 
 - `git_path` (String) Absolute path to the git folder
+
+### Optional
+
+- `diff_mode` (String) DiffMode of the git repository. e.g. 'tag' or 'commit', 'stage', 'dirty'

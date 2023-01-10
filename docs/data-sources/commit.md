@@ -3,12 +3,12 @@
 page_title: "gdiff_commit Data Source - terraform-provider-gdiff"
 subcategory: ""
 description: |-
-  Sample data source in the Terraform provider gdiff.
+  This data source provides the last commit of a file or folder
 ---
 
 # gdiff_commit (Data Source)
 
-Sample data source in the Terraform provider gdiff.
+This data source provides the last commit of a file or folder
 
 ## Example Usage
 
@@ -27,6 +27,7 @@ data "gdiff_commit" "example" {
 
 ### Read-Only
 
+- `hash` (String) The hash of the last commit
 - `id` (String) The ID of this resource.
 
 
