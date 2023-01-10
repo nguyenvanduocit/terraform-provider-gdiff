@@ -2,9 +2,9 @@ package provider
 
 import (
 	"context"
-
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-provider-gdiff/internal/client"
 )
 
 func dataSourceGdiff() *schema.Resource {
@@ -25,11 +25,16 @@ func dataSourceGdiff() *schema.Resource {
 }
 
 func dataSourceGdiffRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	// use the meta value to retrieve your client from the provider configure method
-	// client := meta.(*apiClient)
+	apiClient := meta.(*client.ApiClient)
 
-	idFromAPI := "my-id"
-	d.SetId(idFromAPI)
+	path := d.Get("path").(string)
 
-	return diag.Errorf("not implemented")
+	commit, err := apiClient.GetLastCommit(path)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	d.SetId(commit.String())
+
+	return nil
 }
